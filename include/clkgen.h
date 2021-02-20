@@ -10,6 +10,10 @@
  */
 #ifndef __CLKGEN_H
 #define __CLKGEN_H
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 #include <stdio.h>
 #include "timer_gen.h"
 /**
@@ -46,5 +50,7 @@ clkgen_t create_clk(unsigned long long int interval_nsec, time_handler handler, 
  * @param clkgen Clock ID to be disabled
  */
 void destroy_clk(clkgen_t clkgen);
-
+#ifdef __cplusplus
+}
+#endif
 #endif // __CLKGEN_H

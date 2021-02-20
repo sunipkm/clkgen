@@ -158,7 +158,8 @@ void stop_timer(size_t timer_id)
     if (node)
         free(node);
 #else
-    dispatch_source_cancel(timers[timer_id - 1]);
+    if (timer_id - 1 < ntimers)
+        dispatch_source_cancel(timers[timer_id - 1]);
 #endif
 }
 
