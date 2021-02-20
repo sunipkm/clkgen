@@ -18,6 +18,18 @@
  */
 typedef size_t clkgen_t;
 
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC 1000000000L
+#endif
+
+#ifndef NSEC_PER_MSEC
+#define NSEC_PER_MSEC 1000000L
+#endif
+
+#ifndef NSEC_PER_USEC
+#define NSEC_PER_USEC 1000L
+#endif
+
 /**
  * @brief Create a clock generator instance
  * 
