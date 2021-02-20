@@ -1,3 +1,13 @@
+/**
+ * @file clkgen.c
+ * @author Sunip K. Mukherjee (sunipkmukherjee@gmail.com)
+ * @brief Create a timer that executes the registered handler upon repeated expiration.
+ * @version 1.1
+ * @date 2021-02-20
+ * 
+ * @copyright Copyright (c) 2021
+ * 
+ */
 #include "timer_gen.h"
 #include "clkgen.h"
 

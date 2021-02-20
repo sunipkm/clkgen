@@ -122,7 +122,7 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
     dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
     dispatch_source_set_timer(timers[ntimers - 1], start, interval, 0);
     dispatch_resume(timers[ntimers - 1]);
-    return ntimers - 1;
+    return ntimers;
 #endif
 }
 
@@ -158,7 +158,7 @@ void stop_timer(size_t timer_id)
     if (node)
         free(node);
 #else
-    dispatch_source_cancel(timers[timer_id]);
+    dispatch_source_cancel(timers[timer_id - 1]);
 #endif
 }
 
