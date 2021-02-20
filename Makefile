@@ -20,6 +20,7 @@ UNAME_S := $(shell uname -s)
 
 ifeq ($(UNAME_S), Darwin) #APPLE
 	ECHO_MESSAGE = "Mac OS X $(ARCH)"
+	CC := clang
 	CFLAGS := -arch $(ARCH) -Wall -O2
 endif
 
