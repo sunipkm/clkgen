@@ -113,12 +113,10 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
     dispatch_source_set_event_handler(timers[ntimers - 1], ^{
       handler(ntimers - 1, user_data);
     });
-    fflush(stdout);
     dispatch_source_set_cancel_handler(timers[ntimers - 1], ^{
       dispatch_release(timers[ntimers - 1]);
       dispatch_release(queue);
     });
-    fflush(stdout);
     dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
     dispatch_source_set_timer(timers[ntimers - 1], start, interval, 0);
     dispatch_resume(timers[ntimers - 1]);
