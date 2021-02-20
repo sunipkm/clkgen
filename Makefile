@@ -5,18 +5,37 @@ OBJECTS = src/clkgen.o \
 		  src/timer_gen.o
 
 TESTOBJ = src/test.o
+TESTPROG = test.out
 
 LIBOBJ := libclkgen.a
 
 LDFLAGS := -L./
-CFLAGS := -Wall -std=gnu11 -O2
+
+ARCH=UNDEFINED
+ifeq ($(ARCH),UNDEFINED)
+	ARCH := $(shell uname -m)
+endif
+
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S), Darwin) #APPLE
+	ECHO_MESSAGE = "Mac OS X $(ARCH)"
+	CFLAGS := -arch $(ARCH) -Wall -O2
+endif
+
+ifeq ($(UNAME_S), Linux) #Linux
+	ECHO_MESSAGE = "Linux"
+	CFLAGS := -Wall -O2 -std=gnu11
+endif
+
 LIBS := -lclkgen -lpthread
 
 all : $(LIBOBJ)
+	echo "Built library $(LIBOBJ) for $(ECHO_MESSAGE)"
 
 test: $(TESTOBJ) $(LIBOBJ)
-	$(CC) $(TESTOBJ) $(LDFLAGS) -o test $(LIBS)
-	./test
+	echo "Built for $(ECHO_MESSAGE), execute ./$(TESTPROG)"
+	$(CC) $(TESTOBJ) $(LDFLAGS) -o $(TESTPROG) $(LIBS)
 
 $(LIBOBJ): $(OBJECTS)
 	ar -crus $(LIBOBJ) $(OBJECTS)
@@ -27,5 +46,5 @@ $(LIBOBJ): $(OBJECTS)
 .PHONY: clean
 
 clean:
-	rm -rf $(OBJECTS) $(TESTOBJ) test $(LIBOBJ)
+	rm -rf $(OBJECTS) $(TESTOBJ) $(TESTPROG) $(LIBOBJ)
 

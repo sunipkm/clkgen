@@ -1,7 +1,12 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#ifndef __APPLE__
 #include <sys/timerfd.h>
+#else
+#include <dispatch/dispatch.h>
+#include <stdlib.h>
+#endif
 #include <pthread.h>
 #include <poll.h>
 #include <stdio.h>
@@ -10,6 +15,7 @@
 
 #define MAX_TIMER_COUNT 1000
 
+#ifndef __APPLE__
 struct timer_node
 {
     int fd;
@@ -24,8 +30,20 @@ static void *_timer_thread(void *data);
 static pthread_t g_thread_id;
 static struct timer_node *g_head = NULL;
 
+#else
+static dispatch_queue_t queue;
+static dispatch_source_t *timers = NULL;
+static size_t ntimers = 0;
+static void sigtrap(int sig)
+{
+    for (size_t i = 0; i < ntimers; i++)
+        dispatch_source_cancel(timers[i]);
+}
+#endif
+
 int initialize()
 {
+#ifndef __APPLE__
     if (pthread_create(&g_thread_id, NULL, _timer_thread, NULL))
     {
         /*Thread creation failed*/
@@ -33,10 +51,16 @@ int initialize()
     }
 
     return 1;
+#else
+    signal(SIGINT, sigtrap);
+    queue = dispatch_queue_create("timer_gen_timer_queue", 0);
+    return 1;
+#endif
 }
 
 size_t start_timer(unsigned long long int interval, time_handler handler, t_timer type, void *user_data)
 {
+#ifndef __APPLE__
     struct timer_node *new_node = NULL;
     struct itimerspec new_value;
 
@@ -79,10 +103,32 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
     g_head = new_node;
 
     return (size_t)new_node;
+#else
+    ntimers++;
+    if (timers == NULL)
+        timers = (dispatch_source_t *)malloc(sizeof(dispatch_source_t));
+    else
+        timers = (dispatch_source_t *)realloc(timers, ntimers * sizeof(dispatch_source_t));
+    timers[ntimers - 1] = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+    dispatch_source_set_event_handler(timers[ntimers - 1], ^{
+      handler(ntimers - 1, user_data);
+    });
+    fflush(stdout);
+    dispatch_source_set_cancel_handler(timers[ntimers - 1], ^{
+      dispatch_release(timers[ntimers - 1]);
+      dispatch_release(queue);
+    });
+    fflush(stdout);
+    dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
+    dispatch_source_set_timer(timers[ntimers - 1], start, interval, 0);
+    dispatch_resume(timers[ntimers - 1]);
+    return ntimers - 1;
+#endif
 }
 
 void stop_timer(size_t timer_id)
 {
+#ifndef __APPLE__
     struct timer_node *tmp = NULL;
     struct timer_node *node = (struct timer_node *)timer_id;
 
@@ -111,17 +157,26 @@ void stop_timer(size_t timer_id)
     }
     if (node)
         free(node);
+#else
+    dispatch_source_cancel(timers[timer_id]);
+#endif
 }
 
 void finalize()
 {
+#ifndef __APPLE__
     while (g_head)
         stop_timer((size_t)g_head);
 
     pthread_cancel(g_thread_id);
     pthread_join(g_thread_id, NULL);
+#else
+    for (size_t i = 0; i < ntimers; i++)
+        dispatch_source_cancel(timers[i]);
+    free(timers);
+#endif
 }
-
+#ifndef __APPLE__
 struct timer_node *_get_timer_from_fd(int fd)
 {
     struct timer_node *tmp = g_head;
@@ -186,3 +241,4 @@ void *_timer_thread(void *data)
 
     return NULL;
 }
+#endif

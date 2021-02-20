@@ -4,7 +4,9 @@
 
 typedef enum
 {
+#ifndef __APPLE__
 TIMER_SINGLE_SHOT = 0,
+#endif
 TIMER_PERIODIC
 } t_timer;
 
