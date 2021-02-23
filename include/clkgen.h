@@ -45,6 +45,14 @@ typedef size_t clkgen_t;
 clkgen_t create_clk(unsigned long long int interval_nsec, time_handler handler, void *data);
 
 /**
+ * @brief Update clock interval of existing clock
+ * 
+ * @param clkid Clock to update
+ * @param interval_nsec Clock interval in nanoseconds
+ * @return clkgen_t Instance ID of the clock (should be unchanged, 0 for error)
+ */
+clkgen_t update_clk(clkgen_t clkid, unsigned long long int interval_nsec);
+/**
  * @brief Stop the clock generator instance
  * 
  * @param clkgen Clock ID to be disabled

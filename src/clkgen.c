@@ -30,6 +30,11 @@ clkgen_t create_clk(unsigned long long int interval_nsec, time_handler handler, 
     return start_timer(interval_nsec, handler, TIMER_PERIODIC, data);
 }
 
+clkgen_t update_clk(clkgen_t clkid, unsigned long long int interval_nsec)
+{
+    return update_timer(clkid, interval_nsec, TIMER_PERIODIC);
+}
+
 void destroy_clk(clkgen_t clkgen_id)
 {
     stop_timer(clkgen_id);

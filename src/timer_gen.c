@@ -105,7 +105,7 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
     return (size_t)new_node;
 #else
     ntimers++;
-    if (timers == NULL)
+    if (timers == NULL || ntimers == 0)
         timers = (dispatch_source_t *)malloc(sizeof(dispatch_source_t));
     else
         timers = (dispatch_source_t *)realloc(timers, ntimers * sizeof(dispatch_source_t));
@@ -122,6 +122,40 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
     dispatch_resume(timers[ntimers - 1]);
     return ntimers;
 #endif
+}
+
+size_t update_timer(size_t timer_id, unsigned long long interval, t_timer type)
+{
+#ifndef __APPLE__
+    struct timer_node *node = (struct timer_node *) timer_id;
+    if (node == NULL) // on error, invalid timer ID
+        return (size_t) NULL;
+    struct itimerspec new_value;
+
+    new_value.it_value.tv_sec = interval / 1000000000;
+    new_value.it_value.tv_nsec = (interval % 1000000000);
+
+    if (type == TIMER_PERIODIC)
+    {
+        new_value.it_interval.tv_sec = interval / 1000000000;
+        new_value.it_interval.tv_nsec = (interval % 1000000000);
+    }
+    else
+    {
+        new_value.it_interval.tv_sec = 0;
+        new_value.it_interval.tv_nsec = 0;
+    }
+
+    timerfd_settime(node->fd, 0, &new_value, NULL);
+    return (size_t) node;
+#else
+    if (timer_id > ntimers)
+        return 0;
+    dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
+    dispatch_source_set_timer(timers[ntimers - 1], start, interval, 0);
+    dispatch_resume(timers[ntimers - 1]);
+    return timer_id;
+#endif // __APPLE__
 }
 
 void stop_timer(size_t timer_id)
@@ -173,6 +207,7 @@ void finalize()
     for (size_t i = 0; i < ntimers; i++)
         dispatch_source_cancel(timers[i]);
     free(timers);
+    ntimers = 0;
 #endif
 }
 #ifndef __APPLE__
