@@ -31,6 +31,7 @@ static pthread_t g_thread_id;
 static struct timer_node *g_head = NULL;
 
 #else
+static bool queue_initd = false;
 static dispatch_queue_t queue;
 static dispatch_source_t *timers = NULL;
 static size_t ntimers = 0;
@@ -52,8 +53,12 @@ int initialize()
 
     return 1;
 #else
-    signal(SIGINT, sigtrap);
-    queue = dispatch_queue_create("timer_gen_timer_queue", 0);
+    if (!queue_initd)
+    {
+        queue_initd = true;
+        signal(SIGINT, sigtrap);
+        queue = dispatch_queue_create("timer_gen_timer_queue", 0);
+    }
     return 1;
 #endif
 }
@@ -127,9 +132,9 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
 size_t update_timer(size_t timer_id, unsigned long long interval, t_timer type)
 {
 #ifndef __APPLE__
-    struct timer_node *node = (struct timer_node *) timer_id;
+    struct timer_node *node = (struct timer_node *)timer_id;
     if (node == NULL) // on error, invalid timer ID
-        return (size_t) NULL;
+        return (size_t)NULL;
     struct itimerspec new_value;
 
     new_value.it_value.tv_sec = interval / 1000000000;
@@ -147,13 +152,14 @@ size_t update_timer(size_t timer_id, unsigned long long interval, t_timer type)
     }
 
     timerfd_settime(node->fd, 0, &new_value, NULL);
-    return (size_t) node;
+    return (size_t)node;
 #else
     if (timer_id > ntimers)
         return 0;
     dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
-    dispatch_source_set_timer(timers[ntimers - 1], start, interval, 0);
-    dispatch_resume(timers[ntimers - 1]);
+    dispatch_suspend(timers[timer_id - 1]);
+    dispatch_source_set_timer(timers[timer_id - 1], start, interval, 0);
+    dispatch_resume(timers[timer_id - 1]);
     return timer_id;
 #endif // __APPLE__
 }
@@ -207,6 +213,7 @@ void finalize()
     for (size_t i = 0; i < ntimers; i++)
         dispatch_source_cancel(timers[i]);
     free(timers);
+    timers = NULL;
     ntimers = 0;
 #endif
 }

@@ -31,6 +31,8 @@ int main(int argc, char *argv[])
     }
     clkgen_t clkgen = create_clk(halfperiod, time_handler1, &clk);
     sleep(5);
+    clkgen = update_clk(clkgen, halfperiod >> 1);
+    sleep(5 / 2);
     destroy_clk(clkgen);
     return 0;
 }
