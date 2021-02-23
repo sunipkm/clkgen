@@ -15,36 +15,35 @@
 
 #define MAX_TIMER_COUNT 1000
 
-#ifndef __APPLE__
+
 struct timer_node
 {
+#ifndef __APPLE__
     int fd;
     time_handler callback;
     void *user_data;
     unsigned long long int interval;
     t_timer type;
-    struct timer_node *next;
-};
-
-static void *_timer_thread(void *data);
-static pthread_t g_thread_id;
-static struct timer_node *g_head = NULL;
-
 #else
-static bool queue_initd = false;
-static dispatch_queue_t queue;
-struct timer_node
-{
     bool active;
     dispatch_source_t timer;
+#endif
     struct timer_node *next;
 };
-static struct timer_node *g_head = NULL;
+
+#ifndef __APPLE__
+static void *_timer_thread(void *data);
+static pthread_t g_thread_id;
+#else
 static void sigtrap(int sig)
 {
     finalize();
 }
+
+static bool queue_initd = false;
+static dispatch_queue_t queue;
 #endif
+static struct timer_node *g_head = NULL;
 
 int initialize()
 {
