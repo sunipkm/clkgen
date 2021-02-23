@@ -37,7 +37,6 @@ struct timer_node
 {
     bool active;
     dispatch_source_t timer;
-    unsigned long long int interval;
     struct timer_node *next;
 };
 static struct timer_node *g_head = NULL;
