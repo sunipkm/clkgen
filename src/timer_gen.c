@@ -33,12 +33,17 @@ static struct timer_node *g_head = NULL;
 #else
 static bool queue_initd = false;
 static dispatch_queue_t queue;
-static dispatch_source_t *timers = NULL;
-static size_t ntimers = 0;
+struct timer_node
+{
+    bool active;
+    dispatch_source_t timer;
+    unsigned long long int interval;
+    struct timer_node *next;
+};
+static struct timer_node *g_head = NULL;
 static void sigtrap(int sig)
 {
-    for (size_t i = 0; i < ntimers; i++)
-        dispatch_source_cancel(timers[i]);
+    finalize();
 }
 #endif
 
@@ -109,23 +114,25 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
 
     return (size_t)new_node;
 #else
-    ntimers++;
-    if (timers == NULL || ntimers == 0)
-        timers = (dispatch_source_t *)malloc(sizeof(dispatch_source_t));
-    else
-        timers = (dispatch_source_t *)realloc(timers, ntimers * sizeof(dispatch_source_t));
-    timers[ntimers - 1] = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
-    dispatch_source_set_event_handler(timers[ntimers - 1], ^{
-      handler(ntimers - 1, user_data);
+    struct timer_node *new_node = (struct timer_node *) malloc(sizeof(struct timer_node));
+    if (new_node == NULL)
+        return (size_t) NULL;
+    new_node->timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+    dispatch_source_set_event_handler(new_node->timer, ^{
+      handler((size_t)new_node, user_data);
     });
-    dispatch_source_set_cancel_handler(timers[ntimers - 1], ^{
-      dispatch_release(timers[ntimers - 1]);
+    dispatch_source_set_cancel_handler(new_node->timer, ^{
+      dispatch_release(new_node->timer);
       dispatch_release(queue);
     });
     dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
-    dispatch_source_set_timer(timers[ntimers - 1], start, interval, 0);
-    dispatch_resume(timers[ntimers - 1]);
-    return ntimers;
+    dispatch_source_set_timer(new_node->timer, start, interval, 0);
+    dispatch_resume(new_node->timer);
+    new_node->active = true;
+    /** Inserting the timer node into the list */
+    new_node->next = g_head;
+    g_head = new_node;
+    return (size_t) new_node;
 #endif
 }
 
@@ -154,13 +161,16 @@ size_t update_timer(size_t timer_id, unsigned long long interval, t_timer type)
     timerfd_settime(node->fd, 0, &new_value, NULL);
     return (size_t)node;
 #else
-    if (timer_id > ntimers)
-        return 0;
+    struct timer_node *node = (struct timer_node *)timer_id;
+    if (node == NULL) // on error, invalid timer ID
+        return (size_t)NULL;
     dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
-    dispatch_suspend(timers[timer_id - 1]);
-    dispatch_source_set_timer(timers[timer_id - 1], start, interval, 0);
-    dispatch_resume(timers[timer_id - 1]);
-    return timer_id;
+    dispatch_suspend(node->timer);
+    node->active = false;
+    dispatch_source_set_timer(node->timer, start, interval, 0);
+    dispatch_resume(node->timer);
+    node->active = true;
+    return (size_t) node;
 #endif // __APPLE__
 }
 
@@ -196,8 +206,33 @@ void stop_timer(size_t timer_id)
     if (node)
         free(node);
 #else
-    if (timer_id - 1 < ntimers)
-        dispatch_source_cancel(timers[timer_id - 1]);
+    struct timer_node *tmp = NULL;
+    struct timer_node *node = (struct timer_node *)timer_id;
+    if (node == NULL) // on error, invalid timer ID
+        return;
+    if (node->active == false)
+        dispatch_source_cancel(node->timer);
+    node->active = false;
+    if (node == g_head)
+    {
+        g_head = g_head->next;
+    }
+    else
+    {
+
+        tmp = g_head;
+
+        while (tmp && tmp->next != node)
+            tmp = tmp->next;
+
+        if (tmp)
+        {
+            /*tmp->next can not be NULL here.*/
+            tmp->next = tmp->next->next;
+        }
+    }
+    if (node)
+        free(node);
 #endif
 }
 
@@ -210,11 +245,8 @@ void finalize()
     pthread_cancel(g_thread_id);
     pthread_join(g_thread_id, NULL);
 #else
-    for (size_t i = 0; i < ntimers; i++)
-        dispatch_source_cancel(timers[i]);
-    free(timers);
-    timers = NULL;
-    ntimers = 0;
+    while(g_head)
+        stop_timer((size_t) g_head);
 #endif
 }
 #ifndef __APPLE__
