@@ -32,17 +32,17 @@ endif
 LIBS := -lclkgen -lpthread
 
 all : $(LIBOBJ)
-	echo "Built library $(LIBOBJ) for $(ECHO_MESSAGE)"
+	@echo "Built library $(LIBOBJ) for $(ECHO_MESSAGE)"
 
 test: $(TESTOBJ) $(LIBOBJ)
-	echo "Built for $(ECHO_MESSAGE), execute ./$(TESTPROG)"
-	$(CC) $(TESTOBJ) $(LDFLAGS) -o $(TESTPROG) $(LIBS)
+	@echo "Built for $(ECHO_MESSAGE), execute ./$(TESTPROG)"
+	@$(CC) $(TESTOBJ) $(LDFLAGS) -o $(TESTPROG) $(LIBS)
 
 $(LIBOBJ): $(OBJECTS)
-	ar -crus $(LIBOBJ) $(OBJECTS)
+	@ar -crus $(LIBOBJ) $(OBJECTS)
 
 %.o : %.c
-	$(CC) -c $(CFLAGS) $(INCLUDE_DIR) -o $@ -c $<
+	@$(CC) -c $(CFLAGS) $(INCLUDE_DIR) -o $@ -c $<
 
 .PHONY: clean
 
