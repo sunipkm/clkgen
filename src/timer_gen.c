@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 #ifndef __APPLE__
 #include <sys/timerfd.h>
 #else
@@ -15,19 +16,18 @@
 
 #define MAX_TIMER_COUNT 1000
 
-
 struct timer_node
 {
 #ifndef __APPLE__
     int fd;
-    time_handler callback;
-    void *user_data;
     unsigned long long int interval;
     t_timer type;
 #else
     bool active;
     dispatch_source_t timer;
 #endif
+    time_handler callback;
+    void *user_data;
     struct timer_node *next;
 };
 
@@ -40,8 +40,19 @@ static void sigtrap(int sig)
     finalize();
 }
 
-static bool queue_initd = false;
-static dispatch_queue_t queue;
+static void callback_executor(void *data)
+{
+    assert(data != NULL);
+    struct timer_node *node = (struct timer_node *)data;
+    node->callback((size_t)node, node->user_data);
+}
+
+static void callback_canceller(void *data)
+{
+    assert(data != NULL);
+    struct timer_node *node = (struct timer_node *)data;
+    dispatch_release(node->timer);
+}
 #endif
 static struct timer_node *g_head = NULL;
 
@@ -56,12 +67,8 @@ int initialize()
 
     return 1;
 #else
-    if (!queue_initd)
-    {
-        queue_initd = true;
-        signal(SIGINT, sigtrap);
-        queue = dispatch_queue_create("timer_gen_timer_queue", 0);
-    }
+
+    signal(SIGINT, sigtrap);
     return 1;
 #endif
 }
@@ -75,11 +82,12 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
     if (new_node == NULL)
         return 0;
 
+    new_node->callback = handler;
+    new_node->user_data = user_data;
+
 #ifndef __APPLE__
     struct itimerspec new_value;
 
-    new_node->callback = handler;
-    new_node->user_data = user_data;
     new_node->interval = interval;
     new_node->type = type;
 
@@ -107,14 +115,17 @@ size_t start_timer(unsigned long long int interval, time_handler handler, t_time
 
     timerfd_settime(new_node->fd, 0, &new_value, NULL);
 #else
-    new_node->timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
-    dispatch_source_set_event_handler(new_node->timer, ^{
-      handler((size_t)new_node, user_data);
-    });
-    dispatch_source_set_cancel_handler(new_node->timer, ^{
-      dispatch_release(new_node->timer);
-      dispatch_release(queue);
-    });
+    new_node->timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, NULL);
+    dispatch_set_context(new_node->timer, new_node);
+    dispatch_source_set_event_handler_f(new_node->timer, &callback_executor);
+    dispatch_source_set_cancel_handler_f(new_node->timer, &callback_canceller);
+    // dispatch_source_set_event_handler(new_node->timer, ^{
+    //   handler((size_t)new_node, user_data);
+    // });
+    // dispatch_source_set_cancel_handler(new_node->timer, ^{
+    //   dispatch_release(new_node->timer);
+    //   dispatch_release(queue);
+    // });
     dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
     dispatch_source_set_timer(new_node->timer, start, interval, 0);
     dispatch_resume(new_node->timer);
@@ -158,7 +169,7 @@ size_t update_timer(size_t timer_id, unsigned long long interval, t_timer type)
     dispatch_resume(node->timer);
     node->active = true;
 #endif // __APPLE__
-    return (size_t) node;
+    return (size_t)node;
 }
 
 void stop_timer(size_t timer_id)

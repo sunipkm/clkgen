@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
         return 0;
     }
     static int clk = 0;
+    static int clk2 = 0;
     unsigned long long int halfperiod = atoll(argv[1]);
     if (halfperiod > 5 * NSEC_PER_SEC)
     {
@@ -30,9 +31,11 @@ int main(int argc, char *argv[])
         return 0;
     }
     clkgen_t clkgen = create_clk(halfperiod, time_handler1, &clk);
+    clkgen_t clkgen2 = create_clk(halfperiod, time_handler1, &clk2);
     sleep(5);
     clkgen = update_clk(clkgen, halfperiod >> 1);
     sleep(5 / 2);
     destroy_clk(clkgen);
+    destroy_clk(clkgen2);
     return 0;
 }
